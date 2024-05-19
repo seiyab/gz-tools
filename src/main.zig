@@ -1,24 +1,46 @@
 const std = @import("std");
+const inflate = std.compress.flate.inflate;
+const bytes = @import("./utils/bytes.zig");
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
-
-    try bw.flush(); // don't forget to flush!
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.getStdOut().writer();
+    try st(stdin, stdout);
 }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+const testdata = [_]u8{
+    0x01,
+    0x03,
+    0x00,
+    0xfc,
+    0xff,
+    0x00,
+    0x01,
+    0x02,
+};
+
+fn st(r: anytype, w: anytype) !void {
+    const allocator = std.heap.page_allocator;
+    const d: []u8 = try r.readAllAlloc(allocator, 1_000_000);
+    try w.writeAll(d);
+}
+
+test "check testdata" {
+    const allocator = std.testing.allocator;
+    var w = bytes.BytesWriter.init(allocator);
+    defer w.deinit();
+    var r = bytes.BytesReader.init(&testdata);
+    try inflate.decompress(.raw, r.reader(), w.writer());
+    const out = w.data;
+    try std.testing.expectEqualSlices(u8, testdata[5..], out.items);
+}
+
+test "st" {
+    const allocator = std.testing.allocator;
+    var w = bytes.BytesWriter.init(allocator);
+    defer w.deinit();
+    var r = bytes.BytesReader.init(&testdata);
+    try st(r.reader(), w.writer());
+    const out = w.data;
+    try std.testing.expectEqualSlices(u8, &testdata, out.items);
 }
