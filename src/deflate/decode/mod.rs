@@ -59,20 +59,25 @@ struct RawBlock {
 
 impl RawBlock {
     fn decode<I: iter::Iterator<Item = u8>>(p: &mut I) -> Result<Self> {
-        let len0 = p.next().unwrap() as usize;
-        let len1 = p.next().unwrap() as usize;
-        let len = len0 | (len1 << 8);
-        let nlen0 = p.next().unwrap() as usize;
-        let nlen1 = p.next().unwrap() as usize;
-        let nlen = nlen0 | (nlen1 << 8);
-        if (len ^ nlen) != 0xFFFF {
-            return Err(Error::new("Invalid length"));
-        }
         let mut data = Vec::new();
+        let len = Self::decode_len(p)?;
         for _ in 0..len {
             data.push(p.next().unwrap());
         }
         return Ok(Self { data: data });
+    }
+
+    fn decode_len<I: iter::Iterator<Item = u8>>(i: &mut I) -> Result<usize> {
+        let len0 = i.next().unwrap() as usize;
+        let len1 = i.next().unwrap() as usize;
+        let len = len0 | (len1 << 8);
+        let nlen0 = i.next().unwrap() as usize;
+        let nlen1 = i.next().unwrap() as usize;
+        let nlen = nlen0 | (nlen1 << 8);
+        if (len ^ nlen) != 0xFFFF {
+            return Err(Error::new("Invalid length"));
+        }
+        return Ok(len);
     }
 }
 
