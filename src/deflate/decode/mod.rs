@@ -18,6 +18,14 @@ impl Deflate {
         }
         return Ok(Self { blocks: blocks });
     }
+
+    pub fn data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        for b in &self.blocks {
+            data.extend(b.data());
+        }
+        return data;
+    }
 }
 
 struct Block {
@@ -44,6 +52,14 @@ impl Block {
             }
             _ => {
                 return Err(Error::new("Unsupported block type"));
+            }
+        }
+    }
+
+    fn data(&self) -> Vec<u8> {
+        match &self.body {
+            BlockBody::Raw(r) => {
+                return r.data.clone();
             }
         }
     }
@@ -101,14 +117,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_decode() {
+    fn test_decode_raw_zero() {
         let deflate: Vec<u8> = vec![0x01, 0x00, 0x00, 0xff, 0xff];
         let d = Deflate::decode(&mut deflate.iter().copied()).unwrap();
         assert_eq!(d.blocks.len(), 1);
-        if let BlockBody::Raw(r) = &d.blocks[0].body {
-            assert_eq!(r.data.len(), 0);
-        } else {
-            panic!("Unexpected block type");
-        }
+        assert_eq!(d.data().len(), 0);
+    }
+
+    #[test]
+    fn test_decode_raw() {
+        let deflate = [
+            0x00, 0x01, 0x00, 0xfe, 0xff, 0x01, 0x01, 0x02, 0x00, 0xfd, 0xff, 0x02, 0x03,
+        ];
+        let d = Deflate::decode(&mut deflate.iter().copied()).unwrap();
+        assert_eq!(d.data(), vec![0x01, 0x02, 0x03]);
     }
 }
